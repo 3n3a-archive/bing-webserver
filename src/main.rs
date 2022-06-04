@@ -1,15 +1,16 @@
-// use std::fs;
 use async_std::io::prelude::*;
 use async_std::net::TcpListener;
 use async_std::net::TcpStream;
 use futures::stream::StreamExt;
 use std::borrow::Cow;
-use std::time::Duration;
+use std::path::Path;
+use async_std::fs;
 use async_std::task;
 
 const HTTP_STATUS_200: &str = "HTTP/1.1 200 OK\r\n\r\n";
 const HTTP_STATUS_404: &str = "HTTP/1.1 404 NOT FOUND\r\n\r\n";
 const HTTP_STATUS_501: &str = "HTTP/1.1 501 Not Implemented\r\n\r\n";
+const STATIC_FILE_PATH: &str = ".";
 
 #[async_std::main]
 async fn main() {
@@ -18,7 +19,9 @@ async fn main() {
         .incoming()
         .for_each_concurrent(None, |tcpstream| async move {
             let tcpstream = tcpstream.unwrap();
-            task::spawn(handle_connection(tcpstream));
+            task::spawn(
+                handle_connection(tcpstream)
+            );
         })
         .await;
 }
@@ -31,9 +34,16 @@ async fn handle_connection(mut stream: TcpStream) {
 
     log_request(&http_method, &http_path);
 
-    let (status_line, contents) = handle_path(&http_method, &http_path).await;
+    let (status_line, mut contents) = handle_path(&http_method, &http_path).await;
 
-    let res = format!("{status_line}<html><body>{contents}</body></html>");
+    if &http_method == "HEAD" {
+        // omit body
+        contents = "".to_owned();
+    } else {
+        contents = format!("{contents}");
+    }
+
+    let res = format!("{status_line}{contents}");
     stream.write_all(res.as_bytes()).await.unwrap();
     stream.flush().await.unwrap();
 }
@@ -60,7 +70,7 @@ async fn handle_path(http_method: &str, http_path: &str) -> (String, String) {
     let (status_line, contents) = match &http_method {
         &"GET" => handle_get(&http_path).await,
         &"POST" => handle_post(&http_path).await,
-        // add more methods here
+        &"HEAD" => handle_get(&http_path).await,
         _ => (HTTP_STATUS_501.to_owned(), "<h1>501 Not Implemented</h1>".to_owned())
     };
     
@@ -68,17 +78,36 @@ async fn handle_path(http_method: &str, http_path: &str) -> (String, String) {
 }
 
 async fn handle_get(http_path: &str) -> (String, String) {
-    let (status_line, contents) = match &http_path {
-        &"/" => (HTTP_STATUS_200, "<h1>Hello</h1>"),
-        &"/hello" => (HTTP_STATUS_200, "<h1>My lord, how can I help you?</h1>"),
-        _ => (HTTP_STATUS_404, "<h1>404 Not Found</h1>")
+    let (status_line, contents): (String, String) = match &http_path {
+        &"/" => (String::from(HTTP_STATUS_200), String::from("<h1>Hello</h1>")),
+        &"/hello" => (String::from(HTTP_STATUS_200), String::from("<h1>My lord, how can I help you?</h1>")),
+        _ => {
+            let split_http_path: Vec<_> = http_path.split("/").collect();
+            let filename: &str = split_http_path[1]; // [0] is empty string
+
+            let static_file_path = Path::new(STATIC_FILE_PATH);
+            let static_file = static_file_path.join(filename);
+
+            println!("{}", static_file.display());
+
+            let status_line: String;
+            let contents: String;
+
+            if static_file.is_file() {
+                status_line = String::from(HTTP_STATUS_200);
+                contents = fs::read_to_string(&static_file).await.unwrap();
+            } else {
+                status_line = String::from(HTTP_STATUS_404);
+                contents = String::from("<h1>404 Not Found</h1>");
+            }
+            (status_line, contents)
+        }
     };
 
     (status_line.to_owned(), contents.to_owned())
 }
 
 async fn handle_post(http_path: &str) -> (String, String) {
-    task::sleep(Duration::from_secs(5)).await;
     let (status_line, contents) = match &http_path {
         &"/" => (HTTP_STATUS_200, "<h1>Hello</h1>"),
         &"/hello" => (HTTP_STATUS_200, "<h1>My lord, how can I help you?</h1>"),
