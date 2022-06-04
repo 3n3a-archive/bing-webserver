@@ -6,10 +6,11 @@ use std::borrow::Cow;
 use std::path::Path;
 use async_std::fs;
 use async_std::task;
+use markdown;
 
-const HTTP_STATUS_200: &str = "HTTP/1.1 200 OK\r\n\r\n";
-const HTTP_STATUS_404: &str = "HTTP/1.1 404 NOT FOUND\r\n\r\n";
-const HTTP_STATUS_501: &str = "HTTP/1.1 501 Not Implemented\r\n\r\n";
+const HTTP_STATUS_200: &str = "HTTP/1.1 200 OK\n";
+const HTTP_STATUS_404: &str = "HTTP/1.1 404 NOT FOUND\n";
+const HTTP_STATUS_501: &str = "HTTP/1.1 501 Not Implemented\n";
 const STATIC_FILE_PATH: &str = ".";
 
 #[async_std::main]
@@ -43,7 +44,8 @@ async fn handle_connection(mut stream: TcpStream) {
         contents = format!("{contents}");
     }
 
-    let res = format!("{status_line}{contents}");
+    let headers = "Server: EWS";
+    let res = format!("{status_line}{headers}\r\n\r\n{contents}");
     stream.write_all(res.as_bytes()).await.unwrap();
     stream.flush().await.unwrap();
 }
@@ -91,13 +93,20 @@ async fn handle_get(http_path: &str) -> (String, String) {
             let status_line: String;
             let contents: String;
 
-            if static_file.is_file() {
+            if static_file.is_file() && static_file.to_str().unwrap().ends_with(".html") {
                 status_line = String::from(HTTP_STATUS_200);
                 contents = fs::read_to_string(&static_file).await.unwrap();
+
+            } else if static_file.is_file() && static_file.to_str().unwrap().ends_with(".md") {
+                status_line = String::from(HTTP_STATUS_200) + "Content-Type: text/html; charset=UTF-8\n";
+                contents = markdown::file_to_html(&static_file).unwrap(); 
+
             } else {
                 status_line = String::from(HTTP_STATUS_404);
                 contents = String::from("<h1>404 Not Found</h1>");
+
             }
+
             (status_line, contents)
         }
     };
