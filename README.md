@@ -2,6 +2,8 @@
 
 A webserver that _bings_ the 🛎️.
 
+> This is in no way a fully implemented HTTP-Webserver `;)`
+
 ## Usage
 
 1. Get the binary from github releases
