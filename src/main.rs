@@ -1,31 +1,41 @@
 // use std::fs;
-use std::io::prelude::*;
-use std::net::TcpListener;
-use std::net::TcpStream;
+use async_std::io::prelude::*;
+use async_std::net::TcpListener;
+use async_std::net::TcpStream;
+use futures::stream::StreamExt;
 use std::borrow::Cow;
+use std::time::Duration;
+use async_std::task;
 
-fn main() {
-    let listener = TcpListener::bind("127.0.0.1:7878").unwrap();
+const HTTP_STATUS_200: &str = "HTTP/1.1 200 OK\r\n\r\n";
+const HTTP_STATUS_404: &str = "HTTP/1.1 404 NOT FOUND\r\n\r\n";
+const HTTP_STATUS_501: &str = "HTTP/1.1 501 Not Implemented\r\n\r\n";
 
-    for stream in listener.incoming() {
-        let stream = stream.unwrap();
-        handle_connection(stream);
-    }
+#[async_std::main]
+async fn main() {
+    let listener = TcpListener::bind("127.0.0.1:7878").await.unwrap();
+    listener
+        .incoming()
+        .for_each_concurrent(None, |tcpstream| async move {
+            let tcpstream = tcpstream.unwrap();
+            task::spawn(handle_connection(tcpstream));
+        })
+        .await;
 }
 
-fn handle_connection(mut stream: TcpStream) {
+async fn handle_connection(mut stream: TcpStream) {
     let mut buffer = [0; 1024];
-    stream.read(&mut buffer).unwrap();
+    stream.read(&mut buffer).await.unwrap();
 
     let (http_method, http_path, _http_version) = parse_http_request(&mut buffer);
 
     log_request(&http_method, &http_path);
 
-    let (status_line, contents) = handle_path(&http_method, &http_path);
+    let (status_line, contents) = handle_path(&http_method, &http_path).await;
 
     let res = format!("{status_line}<html><body>{contents}</body></html>");
-    stream.write_all(res.as_bytes()).unwrap();
-    stream.flush().unwrap();
+    stream.write_all(res.as_bytes()).await.unwrap();
+    stream.flush().await.unwrap();
 }
 
 fn log_request(method: &String, path: &String) {
@@ -46,22 +56,33 @@ fn parse_http_request(buffer: &mut [u8; 1024]) -> (String, String, String) {
     (http_method.to_owned(), http_path.to_owned(), http_version.to_owned())
 }
 
-fn handle_path(http_method: &str, http_path: &str) -> (String, String) {
+async fn handle_path(http_method: &str, http_path: &str) -> (String, String) {
     let (status_line, contents) = match &http_method {
-        &"GET" => handle_get(&http_path),
-        &"POST" => handle_get(&http_path),
+        &"GET" => handle_get(&http_path).await,
+        &"POST" => handle_post(&http_path).await,
         // add more methods here
-        _ => ("HTTP/1.1 501 Not Implemented\r\n\r\n".to_owned(), "<h1>501 Not Implemented</h1>".to_owned())
+        _ => (HTTP_STATUS_501.to_owned(), "<h1>501 Not Implemented</h1>".to_owned())
     };
     
     (status_line.to_string(), contents.to_string())
 }
 
-fn handle_get(http_path: &str) -> (String, String) {
+async fn handle_get(http_path: &str) -> (String, String) {
     let (status_line, contents) = match &http_path {
-        &"/" => ("HTTP/1.1 200 OK\r\n\r\n", "<h1>Hello</h1>"),
-        &"/hello" => ("HTTP/1.1 200 OK\r\n\r\n", "<h1>My lord, how can I help you?</h1>"),
-        _ => ("HTTP/1.1 404 NOT FOUND\r\n\r\n", "<h1>404 Not Found</h1>")
+        &"/" => (HTTP_STATUS_200, "<h1>Hello</h1>"),
+        &"/hello" => (HTTP_STATUS_200, "<h1>My lord, how can I help you?</h1>"),
+        _ => (HTTP_STATUS_404, "<h1>404 Not Found</h1>")
+    };
+
+    (status_line.to_owned(), contents.to_owned())
+}
+
+async fn handle_post(http_path: &str) -> (String, String) {
+    task::sleep(Duration::from_secs(5)).await;
+    let (status_line, contents) = match &http_path {
+        &"/" => (HTTP_STATUS_200, "<h1>Hello</h1>"),
+        &"/hello" => (HTTP_STATUS_200, "<h1>My lord, how can I help you?</h1>"),
+        _ => (HTTP_STATUS_404, "<h1>404 Not Found</h1>")
     };
 
     (status_line.to_owned(), contents.to_owned())
