@@ -88,8 +88,6 @@ async fn handle_get(http_path: &str) -> (String, String) {
             let static_file_path = Path::new(STATIC_FILE_PATH);
             let static_file = static_file_path.join(filename);
 
-            println!("{}", static_file.display());
-
             let status_line: String;
             let contents: String;
 
