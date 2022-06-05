@@ -177,7 +177,12 @@ fn get_static_file_info(http_path: &str) -> (bool, PathBuf, &str) {
 
 async fn handle_fs_files(file: &Path) -> (String, String) {
     let content_type: &str = mime_guess::from_path(&file).first_raw().unwrap();
-    let content_type_string: &str = &*format!("Content-Type: {content_type}; charset=UTF-8\n");
+    let content_type_addition: &str = if content_type == "text/html" {
+        "; charset=UTF-8"
+    } else {
+        ""
+    };
+    let content_type_string: &str = &*format!("Content-Type: {content_type}{content_type_addition}\n");
     let status_line: String = String::from(HTTP_STATUS_200) + content_type_string;
     let contents: String = fs::read_to_string(&file).await.unwrap();
     (status_line, contents)
