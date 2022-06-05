@@ -5,13 +5,19 @@ use async_std::net::TcpStream;
 use async_std::task;
 use futures::stream::StreamExt;
 use markdown;
+use mime_guess;
 use std::borrow::Cow;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 const HTTP_STATUS_200: &str = "HTTP/1.1 200 OK\n";
 const HTTP_STATUS_404: &str = "HTTP/1.1 404 NOT FOUND\n";
 const HTTP_STATUS_501: &str = "HTTP/1.1 501 Not Implemented\n";
+const SERVE_STATIC_FILES: bool = true;
 const STATIC_FILE_PATH: &str = ".";
+const ALLOWED_STATIC_FILE_EXTENSIONS: &'static [&str] = &[
+    "html", "md", "css", "js", "jpg", "jpeg", "webp", "png", "avif",
+];
+const RING_BELL_ON_REQUEST: bool = false;
 
 #[async_std::main]
 async fn main() {
@@ -38,8 +44,6 @@ async fn handle_connection(mut stream: TcpStream) {
     if &http_method == "HEAD" {
         // omit body
         contents = "".to_owned();
-    } else {
-        contents = format!("{contents}");
     }
 
     let headers = "Server: EWS";
@@ -49,7 +53,8 @@ async fn handle_connection(mut stream: TcpStream) {
 }
 
 fn log_request(method: &String, path: &String) {
-    println!("{method} {path} \x07", method = method, path = path);
+    let bell: &str = if RING_BELL_ON_REQUEST { "\x07" } else { "" };
+    println!("{method} {path} {bell}", method = method, path = path);
 }
 
 fn parse_http_request(buffer: &mut [u8; 1024]) -> (String, String, String) {
@@ -93,7 +98,23 @@ async fn handle_get(http_path: &str) -> (String, String) {
             String::from(HTTP_STATUS_200),
             String::from("<h1>My lord, how can I help you?</h1>"),
         ),
-        _ => handle_static_files(&http_path).await,
+        _ => {
+            async {
+                let (status_line, contents): (String, String);
+
+                let (file_found, requested_file, file_extension) = get_static_file_info(&http_path);
+                if SERVE_STATIC_FILES && file_found {
+                    (status_line, contents) =
+                        handle_static_files(&requested_file, file_extension).await;
+                } else {
+                    status_line = String::from(HTTP_STATUS_404);
+                    contents = String::from("<h1>404 Not Found</h1>");
+                }
+
+                (status_line, contents)
+            }
+            .await
+        }
     };
 
     (status_line, contents)
@@ -118,42 +139,48 @@ async fn handle_post(http_path: &str) -> (String, String) {
     (status_line, contents)
 }
 
-async fn handle_static_files(http_path: &str) -> (String, String) {
+async fn handle_static_files(requested_file: &PathBuf, file_extension: &str) -> (String, String) {
+    let not_found = (
+        String::from(HTTP_STATUS_404),
+        String::from("<h1>404 Not Found</h1>"),
+    );
+    let (status_line, contents): (String, String) = if ALLOWED_STATIC_FILE_EXTENSIONS
+        .to_vec()
+        .contains(&file_extension)
+    {
+        match &file_extension {
+            &"md" => handle_markdown_files(&requested_file),
+            &"html" => handle_fs_files(&requested_file).await,
+            _ => handle_fs_files(&requested_file).await,
+        }
+    } else {
+        not_found
+    };
+
+    (status_line, contents)
+}
+
+fn get_static_file_info(http_path: &str) -> (bool, PathBuf, &str) {
     let split_http_path: Vec<_> = http_path.split("/").collect();
     let filename: &str = split_http_path[1]; // [0] is empty string
     let file_extension: &str = {
         let split_filename: Vec<_> = filename.split(".").collect();
         split_filename.last().unwrap()
     };
-    println!("{}", file_extension);
 
     let static_file_path = Path::new(STATIC_FILE_PATH);
     let requested_file = static_file_path.join(filename);
+    let file_exists = &requested_file.is_file();
 
-    let mut file_found: bool = true;
-    let mut status_line: String = String::from("");
-    let mut contents: String = String::from("");
-
-    if is_file_of_type(&requested_file, ".html") {
-        status_line = String::from(HTTP_STATUS_200);
-        contents = fs::read_to_string(&requested_file).await.unwrap();
-    } else if is_file_of_type(&requested_file, ".md") {
-        (status_line, contents) = handle_markdown_files(&requested_file)
-    } else {
-        file_found = false;
-    }
-
-
-    if !file_found {
-        status_line = String::from(HTTP_STATUS_404);
-        contents = String::from("<h1>404 Not Found</h1>");
-    }
-
-    (status_line, contents)
+    (*file_exists, requested_file, file_extension)
 }
 
-fn is_file_of_type(file: &Path, filetype: &str) -> bool {
-    file.is_file() && file.to_str().unwrap().ends_with(filetype)
+async fn handle_fs_files(file: &Path) -> (String, String) {
+    let content_type: &str = mime_guess::from_path(&file).first_raw().unwrap();
+    let content_type_string: &str = &*format!("Content-Type: {content_type}; charset=UTF-8\n");
+    let status_line: String = String::from(HTTP_STATUS_200) + content_type_string;
+    let contents: String = fs::read_to_string(&file).await.unwrap();
+    (status_line, contents)
 }
 
 fn handle_markdown_files(file: &Path) -> (String, String) {
