@@ -39,7 +39,7 @@ async fn handle_connection(mut stream: TcpStream) {
 
     log_request(&http_method, &http_path);
 
-    let (status_line, mut contents) = handle_path(&http_method, &http_path).await;
+    let (status_line, mut contents) = handle_method(&http_method, &http_path).await;
 
     if &http_method == "HEAD" {
         // omit body
@@ -75,7 +75,7 @@ fn parse_http_request(buffer: &mut [u8; 1024]) -> (String, String, String) {
     )
 }
 
-async fn handle_path(http_method: &str, http_path: &str) -> (String, String) {
+async fn handle_method(http_method: &str, http_path: &str) -> (String, String) {
     let (status_line, contents): (String, String) = match &http_method {
         &"GET" => handle_get(&http_path).await,
         &"POST" => handle_post(&http_path).await,
