@@ -12,11 +12,11 @@ jobs:
       matrix:
         include:
           - target: x86_64-pc-windows-gnu
-            binary-path: target/${{ matrix.target }}/release/bing-webserver.exe
+            binary-name: bing-webserver.exe
           - target: x86_64-unknown-linux-musl
-            binary-path: target/${{ matrix.target }}/release/bing-webserver
+            binary-name: bing-webserver
           - target: i686-unknown-linux-musl
-            binary-path: target/${{ matrix.target }}/release/bing-webserver
+            binary-name: release/bing-webserver
     steps:
       - uses: actions/checkout@v3
       - uses: actions/cache@v3
@@ -45,7 +45,7 @@ jobs:
           sudo apt install -y tree
           tree
       - name: Zip Binary
-        run: zip bing-webserver-${{ matrix.target }}.zip ${{ matrix.binary-path }}
+        run: zip bing-webserver-${{ matrix.target }}.zip target/${{ matrix.target }}/release/${{ matrix.binary-name }}
       - uses: actions/cache@v3
         with:
           path: |
