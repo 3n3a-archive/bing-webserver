@@ -137,6 +137,7 @@ dependencies = [
  "futures",
  "markdown",
  "mime_guess",
+ "once_cell",
 ]
 
 [[package]]

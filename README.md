@@ -22,3 +22,20 @@ A webserver that _bings_ the 🛎️.
 1. Get the binary from github releases
 2. Put it in `/usr/local/bin/`
 3. You now have the bing webserver!!
+
+### Example
+
+Can be found in [examples folder](./examples).
+
+Just copy the `bing-webserver` binary there and execute it from within that folder. In the config.env file there you can change any variable you'd like.
+
+### Environment Variables
+
+| Key | Usage |
+| --- | --- |
+| `BWS_IP` | `BWS_IP="127.0.0.1"` | 
+| `BWS_PORT` | `BWS_PORT="7878"` | 
+| `BWS_RING_BELL_ON_REQUEST` | `BWS_RING_BELL_ON_REQUEST="false"` | 
+| `BWS_SERVE_STATIC_FILES` | `BWS_SERVE_STATIC_FILES="false"` | 
+| `BWS_STATIC_FILE_PATH` | `BWS_STATIC_FILE_PATH="."` | 
+| `BWS_ALLOWED_STATIC_FILE_EXTENSIONS` | `BWS_ALLOWED_STATIC_FILE_EXTENSIONS="html md css js jpg jpeg webp png avif"` |

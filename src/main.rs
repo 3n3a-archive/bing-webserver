@@ -8,20 +8,33 @@ use markdown;
 use mime_guess;
 use std::borrow::Cow;
 use std::path::{Path, PathBuf};
+use std::env;
+use once_cell::sync::Lazy;
 
 const HTTP_STATUS_200: &str = "HTTP/1.1 200 OK\n";
 const HTTP_STATUS_404: &str = "HTTP/1.1 404 NOT FOUND\n";
 const HTTP_STATUS_501: &str = "HTTP/1.1 501 Not Implemented\n";
-const SERVE_STATIC_FILES: bool = true;
-const STATIC_FILE_PATH: &str = ".";
-const ALLOWED_STATIC_FILE_EXTENSIONS: &'static [&str] = &[
-    "html", "md", "css", "js", "jpg", "jpeg", "webp", "png", "avif",
-];
-const RING_BELL_ON_REQUEST: bool = false;
+
+static SERVE_STATIC_FILES: Lazy<String> = Lazy::new(||env::var("BWS_SERVE_STATIC_FILES").unwrap_or("false".to_string()));
+static STATIC_FILE_PATH: Lazy<String> = Lazy::new(||env::var("BWS_STATIC_FILE_PATH").unwrap_or(".".to_string()));
+static ALLOWED_STATIC_FILE_EXTENSIONS: Lazy<Vec<String>> = Lazy::new(|| {
+    let env_var: String = env::var("BWS_ALLOWED_STATIC_FILE_EXTENSIONS").unwrap_or("html md css js jpg jpeg webp png avif".to_string());
+    let split: Vec<String> = env_var.split_ascii_whitespace().map(|x| x.to_string()).collect();
+    split
+});
+
+static RING_BELL_ON_REQUEST: Lazy<String> = Lazy::new(||env::var("BWS_RING_BELL_ON_REQUEST").unwrap_or("false".to_string()));
+static IP: Lazy<String> = Lazy::new(||env::var("BWS_IP").unwrap_or("127.0.0.1".to_string()));
+static PORT: Lazy<String> = Lazy::new(||env::var("BWS_PORT").unwrap_or("7878".to_string()));
 
 #[async_std::main]
 async fn main() {
-    let listener = TcpListener::bind("127.0.0.1:7878").await.unwrap();
+    // debug env vars
+    //println!("{:?} {:?}", *ALLOWED_STATIC_FILE_EXTENSIONS, *SERVE_STATIC_FILES);
+    let listen_url: &str = &*format!("{}:{}", *IP, *PORT);
+    println!("Listening on http://{}", listen_url);
+
+    let listener = TcpListener::bind(listen_url).await.unwrap();
     listener
         .incoming()
         .for_each_concurrent(None, |tcpstream| async move {
@@ -53,7 +66,7 @@ async fn handle_connection(mut stream: TcpStream) {
 }
 
 fn log_request(method: &String, path: &String) {
-    let bell: &str = if RING_BELL_ON_REQUEST { "\x07" } else { "" };
+    let bell: &str = if *RING_BELL_ON_REQUEST == "true" { "\x07" } else { "" };
     println!("{method} {path} {bell}", method = method, path = path);
 }
 
@@ -103,7 +116,7 @@ async fn handle_get(http_path: &str) -> (String, String) {
                 let (status_line, contents): (String, String);
 
                 let (file_found, requested_file, file_extension) = get_static_file_info(&http_path);
-                if SERVE_STATIC_FILES && file_found {
+                if &*SERVE_STATIC_FILES == "true" && file_found {
                     (status_line, contents) =
                         handle_static_files(&requested_file, file_extension).await;
                 } else {
@@ -144,9 +157,8 @@ async fn handle_static_files(requested_file: &PathBuf, file_extension: &str) -> 
         String::from(HTTP_STATUS_404),
         String::from("<h1>404 Not Found</h1>"),
     );
-    let (status_line, contents): (String, String) = if ALLOWED_STATIC_FILE_EXTENSIONS
-        .to_vec()
-        .contains(&file_extension)
+    let (status_line, contents): (String, String) = if (*ALLOWED_STATIC_FILE_EXTENSIONS)
+        .contains(&file_extension.to_string())
     {
         match &file_extension {
             &"md" => handle_markdown_files(&requested_file),
@@ -168,7 +180,7 @@ fn get_static_file_info(http_path: &str) -> (bool, PathBuf, &str) {
         split_filename.last().unwrap()
     };
 
-    let static_file_path = Path::new(STATIC_FILE_PATH);
+    let static_file_path = Path::new(&*STATIC_FILE_PATH);
     let requested_file = static_file_path.join(filename);
     let file_exists = &requested_file.is_file();
 
