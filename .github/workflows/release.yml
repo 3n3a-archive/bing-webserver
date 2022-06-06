@@ -37,32 +37,32 @@ jobs:
           use-cross: true
           command: build
           args: -r --target ${{ matrix.target }}
-      - name: output directory
+      - name: Debug Directory structure
         run: |
           sudo apt install -y tree
           tree
-  #     - name: Zip Binary
-  #       run: (cd target/release && zip bing-webserver-${{ matrix.target }}.zip bing-webserver)
-  #     - uses: actions/cache@v3
-  #       with:
-  #         path: |
-  #           target/release/bing-webserver-${{ matrix.target }}.zip
-  #         key: bing-webserver-${{ matrix.target }}
-  # release:
-  #   name: release to github 
-  #   needs: build
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #     - uses: actions/cache@v3
-  #       with:
-  #         path: |
-  #           target/release/
-  #         key: bing-webserver-${{ github.ref_name }}
-  #         restore-keys: |
-  #           bing-webserver-
-  #     - uses: "marvinpinto/action-automatic-releases@latest"
-  #       with:
-  #         repo_token: "${{ secrets.GITHUB_TOKEN }}"
-  #         prerelease: false
-  #         files: |
-  #           target/release/*.zip
+      - name: Zip Binary
+        run: zip bing-webserver-${{ matrix.target }}.zip target/${{ matrix.target }}/release/bing-webserver
+      - uses: actions/cache@v3
+        with:
+          path: |
+            bing-webserver-${{ matrix.target }}.zip
+          key: bing-webserver-${{ matrix.target }}
+  release:
+    name: release to github 
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/cache@v3
+        with:
+          path: |
+            *.zip
+          key: bing-webserver-${{ github.ref_name }}
+          restore-keys: |
+            bing-webserver-
+      - uses: "marvinpinto/action-automatic-releases@latest"
+        with:
+          repo_token: "${{ secrets.GITHUB_TOKEN }}"
+          prerelease: false
+          files: |
+            target/release/*.zip
