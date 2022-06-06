@@ -69,4 +69,4 @@ jobs:
           repo_token: "${{ secrets.GITHUB_TOKEN }}"
           prerelease: false
           files: |
-            target/release/*.zip
+            *.zip
