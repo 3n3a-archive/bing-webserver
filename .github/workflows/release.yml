@@ -32,16 +32,17 @@ jobs:
         run: (cd target/release && zip bing-webserver-${{ matrix.target }}.zip bing-webserver)
       - uses: actions/cache@v3
         with:
-        path: |
-          target/release/bing-webserver-${{ matrix.target }}.zip
-        key: bing-webserver-${{ matrix.target }}
+          path: |
+            target/release/bing-webserver-${{ matrix.target }}.zip
+          key: bing-webserver-${{ matrix.target }}
   release:
+    needs: build
     steps:
       - uses: actions/cache@v3
         with:
           path: |
             target/release/
-          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          key: bing-webserver-${{  }}
           restore-keys: |
             bing-webserver-
       - uses: "marvinpinto/action-automatic-releases@latest"
