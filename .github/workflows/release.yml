@@ -53,6 +53,7 @@ jobs:
         run: |
           cd target/${{ matrix.target }}/release/
           zip -D bing-webserver-${{ matrix.target }}.zip ${{ matrix.binary-name }}
+          mv bing-webserver-${{ matrix.target }}.zip ../../../
       - uses: actions/upload-artifact@v3
         with:
           name: bing-webserver-${{ matrix.target }}
