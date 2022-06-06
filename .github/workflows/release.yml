@@ -47,7 +47,9 @@ jobs:
           sudo apt install -y tree
           tree
       - name: Zip Binary
-        run: zip -D bing-webserver-${{ matrix.target }}.zip target/${{ matrix.target }}/release/${{ matrix.binary-name }}
+        run: |
+          cd target/${{ matrix.target }}/release/
+          zip -D bing-webserver-${{ matrix.target }}.zip ${{ matrix.binary-name }}
       - uses: actions/upload-artifact@v3
         with:
           name: bing-webserver-${{ matrix.target }}
