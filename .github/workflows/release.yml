@@ -46,11 +46,12 @@ jobs:
           tree
       - name: Zip Binary
         run: zip bing-webserver-${{ matrix.target }}.zip target/${{ matrix.target }}/release/${{ matrix.binary-name }}
-      - uses: actions/cache@v3
+      - name: Cache built zip
+        uses: actions/cache@v3
         with:
           path: |
-            bing-webserver-${{ matrix.target }}.zip
-          key: bing-webserver-${{ matrix.target }}
+            *.zip
+          key: bing-webserver-${{ github.ref_name }}
   release:
     name: release to github 
     needs: build
