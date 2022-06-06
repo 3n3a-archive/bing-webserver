@@ -24,10 +24,13 @@ jobs:
         with:
           toolchain: stable
           target: ${{ matrix.target }}
-          default: true
           override: true
-      - name: Build with Cargo
-        run: cargo build --release --target ${{ matrix.target }}
+      - name: Run cargo build
+        uses: actions-rs/cargo@v1
+        with:
+          use-cross: true
+          command: build
+          args: -r --target ${{ matrix.target }}
       - name: Zip Binary
         run: (cd target/release && zip bing-webserver-${{ matrix.target }}.zip bing-webserver)
       - uses: actions/cache@v3
