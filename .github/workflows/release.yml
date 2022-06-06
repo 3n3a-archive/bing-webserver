@@ -42,10 +42,6 @@ jobs:
           toolchain: stable
           target: ${{ matrix.target }}
           override: true
-      - uses: actions-rs/install@v0.1
-        with:
-          crate: cross
-          version: latest
       - name: Run cargo build
         uses: actions-rs/cargo@v1
         with:
