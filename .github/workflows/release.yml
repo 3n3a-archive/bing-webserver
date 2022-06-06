@@ -44,7 +44,7 @@ jobs:
         with:
           path: |
             target/release/
-          key: bing-webserver-${{  }}
+          key: bing-webserver-${{ github.ref_name }}
           restore-keys: |
             bing-webserver-
       - uses: "marvinpinto/action-automatic-releases@latest"
