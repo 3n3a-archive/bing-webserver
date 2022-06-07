@@ -52,16 +52,17 @@ async fn handle_connection(mut stream: TcpStream) {
 
     log_request(&http_method, &http_path);
 
-    let (status_line, mut contents) = handle_method(&http_method, &http_path).await;
+    let (status_line, mut contents): (String, Vec<u8>)= handle_method(&http_method, &http_path).await;
 
     if &http_method == "HEAD" {
         // omit body
-        contents = "".to_owned();
+        contents = "".to_owned().into_bytes();
     }
 
     let headers = "Server: EWS";
-    let res = format!("{status_line}{headers}\r\n\r\n{contents}");
+    let res = format!("{status_line}{headers}\r\n\r\n");
     stream.write_all(res.as_bytes()).await.unwrap();
+    stream.write_all(contents.as_slice()).await.unwrap();
     stream.flush().await.unwrap();
 }
 
@@ -88,32 +89,32 @@ fn parse_http_request(buffer: &mut [u8; 1024]) -> (String, String, String) {
     )
 }
 
-async fn handle_method(http_method: &str, http_path: &str) -> (String, String) {
-    let (status_line, contents): (String, String) = match &http_method {
+async fn handle_method(http_method: &str, http_path: &str) -> (String, Vec<u8>) {
+    let (status_line, contents): (String, Vec<u8>) = match &http_method {
         &"GET" => handle_get(&http_path).await,
         &"POST" => handle_post(&http_path).await,
         &"HEAD" => handle_get(&http_path).await,
         _ => (
             String::from(HTTP_STATUS_501),
-            String::from("<h1>501 Not Implemented</h1>"),
+            String::from("<h1>501 Not Implemented</h1>").into_bytes(),
         ),
     };
     (status_line, contents)
 }
 
-async fn handle_get(http_path: &str) -> (String, String) {
-    let (status_line, contents): (String, String) = match &http_path {
+async fn handle_get(http_path: &str) -> (String, Vec<u8>) {
+    let (status_line, contents): (String, Vec<u8>) = match &http_path {
         &"/" => (
             String::from(HTTP_STATUS_200),
-            String::from("<h1>Hello</h1>"),
+            String::from("<h1>Hello</h1>").into_bytes()
         ),
         &"/hello" => (
             String::from(HTTP_STATUS_200),
-            String::from("<h1>My lord, how can I help you?</h1>"),
+            String::from("<h1>My lord, how can I help you?</h1>").into_bytes(),
         ),
         _ => {
             async {
-                let (status_line, contents): (String, String);
+                let (status_line, contents): (String, Vec<u8>);
 
                 let (file_found, requested_file, file_extension) = get_static_file_info(&http_path);
                 if &*SERVE_STATIC_FILES == "true" && file_found {
@@ -121,9 +122,8 @@ async fn handle_get(http_path: &str) -> (String, String) {
                         handle_static_files(&requested_file, file_extension).await;
                 } else {
                     status_line = String::from(HTTP_STATUS_404);
-                    contents = String::from("<h1>404 Not Found</h1>");
+                    contents = String::from("<h1>404 Not Found</h1>").into_bytes();
                 }
-
                 (status_line, contents)
             }
             .await
@@ -133,31 +133,31 @@ async fn handle_get(http_path: &str) -> (String, String) {
     (status_line, contents)
 }
 
-async fn handle_post(http_path: &str) -> (String, String) {
-    let (status_line, contents): (String, String) = match &http_path {
+async fn handle_post(http_path: &str) -> (String, Vec<u8>) {
+    let (status_line, contents): (String, Vec<u8>) = match &http_path {
         &"/" => (
             String::from(HTTP_STATUS_200),
-            String::from("<h1>Hello</h1>"),
+            String::from("<h1>Hello</h1>").into_bytes(),
         ),
         &"/hello" => (
             String::from(HTTP_STATUS_200),
-            String::from("<h1>My lord, how can I help you?</h1>"),
+            String::from("<h1>My lord, how can I help you?</h1>").into_bytes(),
         ),
         _ => (
             String::from(HTTP_STATUS_404),
-            String::from("<h1>404 Not Found</h1>"),
+            String::from("<h1>404 Not Found</h1>").into_bytes(),
         ),
     };
 
     (status_line, contents)
 }
 
-async fn handle_static_files(requested_file: &PathBuf, file_extension: &str) -> (String, String) {
+async fn handle_static_files(requested_file: &PathBuf, file_extension: &str) -> (String, Vec<u8>) {
     let not_found = (
         String::from(HTTP_STATUS_404),
-        String::from("<h1>404 Not Found</h1>"),
+        String::from("<h1>404 Not Found</h1>").into_bytes(),
     );
-    let (status_line, contents): (String, String) = if (*ALLOWED_STATIC_FILE_EXTENSIONS)
+    let (status_line, contents): (String, Vec<u8>) = if (*ALLOWED_STATIC_FILE_EXTENSIONS)
         .contains(&file_extension.to_string())
     {
         match &file_extension {
@@ -187,7 +187,7 @@ fn get_static_file_info(http_path: &str) -> (bool, PathBuf, &str) {
     (*file_exists, requested_file, file_extension)
 }
 
-async fn handle_fs_files(file: &Path) -> (String, Option) {
+async fn handle_fs_files(file: &Path) -> (String, Vec<u8>) {
     let content_type: &str = mime_guess::from_path(&file).first_raw().unwrap();
     let content_type_addition: &str = if content_type == "text/html" {
         "; charset=UTF-8"
@@ -196,13 +196,13 @@ async fn handle_fs_files(file: &Path) -> (String, Option) {
     };
     let content_type_string: &str = &*format!("Content-Type: {content_type}{content_type_addition}\n");
     let status_line: String = String::from(HTTP_STATUS_200) + content_type_string;
-    let contents: Option = fs::read(&file).await.unwrap();
+    let contents: Vec<u8> = fs::read(&file).await.unwrap();
     (status_line, contents)
 }
 
-fn handle_markdown_files(file: &Path) -> (String, String) {
+fn handle_markdown_files(file: &Path) -> (String, Vec<u8>) {
     let status_line: String =
         String::from(HTTP_STATUS_200) + "Content-Type: text/html; charset=UTF-8\n";
-    let contents: String = markdown::file_to_html(&file).unwrap();
+    let contents: Vec<u8> = markdown::file_to_html(&file).unwrap().into_bytes();
     (status_line, contents)
 }
