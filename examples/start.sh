@@ -8,4 +8,4 @@ set -o allexport
 source config.env set +o allexport
 
 # start webserver
-./bing-webserver
+../target/debug/bing-webserver

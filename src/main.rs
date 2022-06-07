@@ -62,6 +62,7 @@ async fn handle_connection(mut stream: TcpStream) {
     let headers = "Server: EWS";
     let res = format!("{status_line}{headers}\r\n\r\n");
     stream.write_all(res.as_bytes()).await.unwrap();
+    // Source https://stackoverflow.com/a/57629051
     stream.write_all(contents.as_slice()).await.unwrap();
     stream.flush().await.unwrap();
 }
