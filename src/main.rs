@@ -18,7 +18,7 @@ const HTTP_STATUS_501: &str = "HTTP/1.1 501 Not Implemented\n";
 static SERVE_STATIC_FILES: Lazy<String> = Lazy::new(||env::var("BWS_SERVE_STATIC_FILES").unwrap_or("false".to_string()));
 static STATIC_FILE_PATH: Lazy<String> = Lazy::new(||env::var("BWS_STATIC_FILE_PATH").unwrap_or(".".to_string()));
 static ALLOWED_STATIC_FILE_EXTENSIONS: Lazy<Vec<String>> = Lazy::new(|| {
-    let env_var: String = env::var("BWS_ALLOWED_STATIC_FILE_EXTENSIONS").unwrap_or("html md css js jpg jpeg webp png avif".to_string());
+    let env_var: String = env::var("BWS_ALLOWED_STATIC_FILE_EXTENSIONS").unwrap_or("html md css js jpg jpeg webp png avif mp4 webm ogg mp3 wav".to_string());
     let split: Vec<String> = env_var.split_ascii_whitespace().map(|x| x.to_string()).collect();
     split
 });
@@ -193,7 +193,7 @@ async fn handle_fs_files(file: &Path) -> (String, Vec<u8>) {
     let content_type_addition: &str = match content_type {
         "text/html" => "; charset=UTF-8",
         "image/jpeg" | "image/png" | "image/gif" | "image/webp" | "image/avif" | "image/svg+xml" => "\r\nTransfer-Encoding: gzip, deflate",
-        "video/mp4" | "video/webm" | "video/ogg" | "video/mpeg" | "audio/mpeg" | "application/ogg" | "audio/webm" | "audio/ogg" | "audio/wave" | "audio/wav" | "audio/x-wav" | "audio/x-pn-wav" | "audio/opus" => "\r\nTransfer-Encoding: chunked",
+        "video/mp4" | "video/webm" | "video/ogg" | "video/mpeg" | "audio/mpeg" | "application/ogg" | "audio/webm" | "audio/ogg" | "audio/wave" | "audio/wav" | "audio/x-wav" | "audio/x-pn-wav" | "audio/opus" => "\r\nTransfer-Encoding: gzip, deflate", // chunekd won't work, because async std doesn't have write
         _ => ""
     };
     let content_type_string: &str = &*format!("Content-Type: {content_type}{content_type_addition}\r\n");
