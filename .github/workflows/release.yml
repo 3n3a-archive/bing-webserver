@@ -94,17 +94,9 @@ jobs:
             *.zip
   release-docker:
     name: release docker image
-    needs: build
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      - uses: actions/download-artifact@v3
-        with:
-          name: bing-webserver-x86_64-unknown-linux-gnu
-      - name: Unzip Binary
-        run: |
-          unzip bing-webserver-x86_64-unknown-linux-gnu.zip
-          ls -lha
       -
         name: Docker meta
         id: meta
