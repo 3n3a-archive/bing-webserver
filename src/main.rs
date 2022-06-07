@@ -59,7 +59,7 @@ async fn handle_connection(mut stream: TcpStream) {
         contents = "".to_owned().into_bytes();
     }
 
-    let headers = "Server: EWS";
+    let headers = format!("Server: EWS\r\nContent-Length: {}", contents.len());
     let res = format!("{status_line}{headers}\r\n\r\n");
     stream.write_all(res.as_bytes()).await.unwrap();
     // Source https://stackoverflow.com/a/57629051
@@ -190,12 +190,13 @@ fn get_static_file_info(http_path: &str) -> (bool, PathBuf, &str) {
 
 async fn handle_fs_files(file: &Path) -> (String, Vec<u8>) {
     let content_type: &str = mime_guess::from_path(&file).first_raw().unwrap();
-    let content_type_addition: &str = if content_type == "text/html" {
-        "; charset=UTF-8"
-    } else {
-        ""
+    let content_type_addition: &str = match content_type {
+        "text/html" => "; charset=UTF-8",
+        "image/jpeg" | "image/png" | "image/gif" | "image/webp" | "image/avif" | "image/svg+xml" => "\r\nTransfer-Encoding: gzip, deflate",
+        "video/mp4" | "video/webm" | "video/ogg" | "video/mpeg" | "audio/mpeg" | "application/ogg" | "audio/webm" | "audio/ogg" | "audio/wave" | "audio/wav" | "audio/x-wav" | "audio/x-pn-wav" | "audio/opus" => "\r\nTransfer-Encoding: chunked",
+        _ => ""
     };
-    let content_type_string: &str = &*format!("Content-Type: {content_type}{content_type_addition}\n");
+    let content_type_string: &str = &*format!("Content-Type: {content_type}{content_type_addition}\r\n");
     let status_line: String = String::from(HTTP_STATUS_200) + content_type_string;
     let contents: Vec<u8> = fs::read(&file).await.unwrap();
     (status_line, contents)
