@@ -1,0 +1,11 @@
+version: '3.3'
+services:
+    bing-webserver:
+        ports:
+            - '7878:7878'
+        volumes:
+            - './static_files/:/app/static'
+        environment:
+            - BWS_SERVE_STATIC_FILES=true
+            - BWS_STATIC_FILE_PATH=/app/static
+        image: '3n3a/bing-webserver:latest'
