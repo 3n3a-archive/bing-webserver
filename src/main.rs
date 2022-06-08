@@ -74,7 +74,7 @@ async fn handle_connection(mut stream: TcpStream) {
 
     stream.write_all(res.as_bytes()).await.unwrap();
     // Source https://stackoverflow.com/a/57629051
-    stream.write_all(&contents_slice).await.unwrap();
+    stream.write_all(contents_slice).await.unwrap();
     stream.flush().await.unwrap();
 }
 
