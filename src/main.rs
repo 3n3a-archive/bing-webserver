@@ -1,3 +1,6 @@
+use log::{info, warn, debug, error};
+use env_logger;
+
 use async_std::fs;
 use async_std::io::prelude::*;
 use async_std::net::TcpListener;
@@ -10,6 +13,7 @@ use std::borrow::Cow;
 use std::path::{Path, PathBuf};
 use std::env;
 use once_cell::sync::Lazy;
+
 
 const HTTP_STATUS_200: &str = "HTTP/1.1 200 OK\n";
 const HTTP_STATUS_404: &str = "HTTP/1.1 404 NOT FOUND\n";
@@ -29,10 +33,12 @@ static PORT: Lazy<String> = Lazy::new(||env::var("BWS_PORT").unwrap_or("7878".to
 
 #[async_std::main]
 async fn main() {
-    // debug env vars
-    //println!("{:?} {:?}", *ALLOWED_STATIC_FILE_EXTENSIONS, *SERVE_STATIC_FILES);
+    env_logger::init();
+
+    print_environemnt_variables();
+
     let listen_url: &str = &*format!("{}:{}", *IP, *PORT);
-    println!("Listening on http://{}", listen_url);
+    info!("Listening on http://{}", listen_url);
 
     let listener = TcpListener::bind(listen_url).await.unwrap();
     listener
@@ -61,15 +67,27 @@ async fn handle_connection(mut stream: TcpStream) {
 
     let headers = format!("Server: EWS\r\nContent-Length: {}", contents.len());
     let res = format!("{status_line}{headers}\r\n\r\n");
+
+    debug!("{}", res);
+
+    let contents_slice: &[u8] = contents.as_slice();
+
     stream.write_all(res.as_bytes()).await.unwrap();
     // Source https://stackoverflow.com/a/57629051
-    stream.write_all(contents.as_slice()).await.unwrap();
+    stream.write_all(&contents_slice).await.unwrap();
     stream.flush().await.unwrap();
 }
 
 fn log_request(method: &String, path: &String) {
     let bell: &str = if *RING_BELL_ON_REQUEST == "true" { "\x07" } else { "" };
-    println!("{method} {path} {bell}", method = method, path = path);
+    info!("{method} {path} {bell}", method = method, path = path);
+}
+
+fn print_environemnt_variables() {
+    debug!("SERVE_STATIC_FILES: {:?}", *SERVE_STATIC_FILES);
+    debug!("STATIC_FILE_PATH: {:?}", *STATIC_FILE_PATH);
+    debug!("ALLOWED_STATIC_FILE_EXTENSIONS: {:?}", *ALLOWED_STATIC_FILE_EXTENSIONS);
+    debug!("RING_BELL_ON_REQUEST: {:?}", *RING_BELL_ON_REQUEST);
 }
 
 fn parse_http_request(buffer: &mut [u8; 1024]) -> (String, String, String) {
@@ -118,6 +136,9 @@ async fn handle_get(http_path: &str) -> (String, Vec<u8>) {
                 let (status_line, contents): (String, Vec<u8>);
 
                 let (file_found, requested_file, file_extension) = get_static_file_info(&http_path);
+
+                debug!("Filepath: {} Was found: {} Extension: {}", requested_file.display(), file_found, file_extension);
+
                 if &*SERVE_STATIC_FILES == "true" && file_found {
                     (status_line, contents) =
                         handle_static_files(&requested_file, file_extension).await;
