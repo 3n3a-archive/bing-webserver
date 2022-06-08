@@ -29,6 +29,12 @@ Can be found in [examples folder](./examples).
 
 Just copy the `bing-webserver` binary there and execute it from within that folder. In the config.env file there you can change any variable you'd like.
 
+### Docker
+
+```sh
+docker run -p 7878:7878 3n3a/bing-webserver:latest
+```
+
 ### Environment Variables
 
 | Key | Usage |

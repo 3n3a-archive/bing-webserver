@@ -40,4 +40,6 @@ COPY --from=builder /app/target/x86_64-unknown-linux-musl/release/bing-webserver
 # Use an unprivileged user.
 USER app:app
 
+ENV BWS_IP=0.0.0.0
+
 CMD ["/app/bing-webserver"]
